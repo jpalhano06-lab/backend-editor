@@ -27,7 +27,7 @@ from urllib.parse import quote
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import animacoes, aprendizados, cenas, corrigir, diretor, fish, pago, voz_local, publicacao, qualidade, shorts, thumbnail, rostos, revisao_video, trilha, custos, custos_reais, genaipro, imagens, limpeza, midia, narracao, nichos, render, roteirista, verificar
+from . import animacoes, aprendizados, cenas, chatgpt_assinatura, corrigir, diretor, fish, pago, voz_local, publicacao, qualidade, shorts, thumbnail, rostos, revisao_video, trilha, custos, custos_reais, genaipro, imagens, limpeza, midia, narracao, nichos, render, roteirista, verificar
 from . import tempos
 from . import texto as tx
 from . import youtube_publicar as ytpub
@@ -95,7 +95,8 @@ MODELOS_NARRACAO = [
 MODELO_GOOGLE = getattr(imagens, "MODELO_GOOGLE", "gemini-3.1-flash-lite-image")
 MODELO_KIE = getattr(imagens, "MODELO_KIE", "grok-imagine-image-2-0/text-to-image")
 MODELO_OPENROUTER_IMAGEM = getattr(imagens, "MODELO_OPENROUTER", "openai/gpt-5.4-image-2")
-PROVEDORES_IMAGEM = {"google": MODELO_GOOGLE, "kie": MODELO_KIE, "openrouter": MODELO_OPENROUTER_IMAGEM}
+PROVEDORES_IMAGEM = {"google": MODELO_GOOGLE, "kie": MODELO_KIE, "openrouter": MODELO_OPENROUTER_IMAGEM,
+                     "assinatura": chatgpt_assinatura.MODELO_IMAGEM}
 
 def _frame_do_video(video: Path, saida: Path, tempo: float = 0.5):
     cmd = ["ffmpeg", "-y", "-ss", str(tempo), "-i", str(video), "-vframes", "1", "-q:v", "2", str(saida)]
@@ -1309,8 +1310,23 @@ def listar_provedores_imagem():
     precos = (config_geral().get("precos") or {})
     preco_google = precos.get("imagem", 0.0336)
     preco_google_lote = precos.get("imagem_lote", 0.0168)
+    assinatura = chatgpt_assinatura.estado()
     return {
         "provedores": [
+            {
+                "id": "assinatura",
+                "nome": "Assinatura do ChatGPT",
+                "modelo": chatgpt_assinatura.MODELO_IMAGEM,
+                "custo": "nada por imagem: gasta o limite da sua assinatura (janela de 5 horas e semana)",
+                "descricao": "As imagens saem pela conta ChatGPT logada neste computador (`codex login`), sem chave "
+                             "de API. Se o limite acabar no meio de um vídeo, as que faltam saem pela chave de API."
+                             + ("" if assinatura.get("conectada")
+                                else " Agora não dá para usar: " + str(assinatura.get("motivo") or "sem login")),
+                "disponivel": bool(assinatura.get("conectada")),
+                "conta": assinatura.get("email") or "",
+                "plano": assinatura.get("plano") or "",
+                "recomendado": False,
+            },
             {
                 "id": "openrouter",
                 "nome": "GPT-5.4 Image 2 (OpenRouter)",
@@ -1337,6 +1353,13 @@ def listar_provedores_imagem():
             },
         ]
     }
+
+
+@app.get("/api/chatgpt/estado")
+def estado_da_assinatura():
+    """A conta ChatGPT logada neste computador, o plano e quanto já foi usado das janelas de limite. O Radar mostra
+    isto no cartão de Conexões da conta."""
+    return chatgpt_assinatura.estado()
 
 
 @app.get("/api/nichos/buscar")
@@ -1782,7 +1805,7 @@ def definir_provedor_imagem(nome: str, payload: ImagensAjustesPayload):
     if not pasta.exists():
         raise HTTPException(status_code=404, detail=f"Projeto '{nome}' não encontrado.")
     if payload.provedor not in PROVEDORES_IMAGEM:
-        raise HTTPException(status_code=400, detail="provedor precisa ser 'openrouter', 'google' ou 'kie'.")
+        raise HTTPException(status_code=400, detail="provedor precisa ser 'assinatura', 'openrouter', 'google' ou 'kie'.")
     p = Projeto(nome)
     p.definir_imagens_override({
         "provedor": payload.provedor,

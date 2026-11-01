@@ -59,8 +59,11 @@ midia_real:
     Nunca continue mostrando o sujeito da parte anterior depois que a narração passou para outro.
 
 imagens:
-  provedor: openrouter               # openrouter (pela chave do OpenRouter), kie (Grok Imagine 2 pela Kie.ai, US$ 0,02,
-                                     # com saldo à parte) ou google (Nano Banana 2)
+  provedor: openrouter               # assinatura (a conta ChatGPT logada neste computador, sem custo por imagem),
+                                     # openrouter (pela chave do OpenRouter), kie (Grok Imagine 2 pela Kie.ai,
+                                     # US$ 0,02, com saldo à parte) ou google (Nano Banana 2)
+  # provedor_reserva: openrouter     # só com provedor assinatura: quem gera as imagens que faltarem se o limite
+                                     # da assinatura acabar no meio do vídeo
   modelo: openai/gpt-5.4-image-2     # GPT-5.4 Image 2, em 16:9; x-ai/grok-imagine-image-2.0 é o Grok (US$ 0,04)
   qualidade: low                     # low (uns US$ 0,005 por imagem, medido), medium ou high (uns US$ 0,13)
   proporcao: "16:9"
