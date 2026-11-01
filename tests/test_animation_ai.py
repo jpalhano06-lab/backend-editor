@@ -86,6 +86,17 @@ def test_numero_conta_subindo_mas_ano_nao():
     assert a._partes_do_numero("1875")[4] is False
 
 
+def test_data_nao_conta_subindo():
+    # "14 de abril" contando mostrava "4 de abril" e "6 de abril" antes da data certa (cena 4 do davy)
+    assert a._partes_do_numero("14 de abril") == ("", 14.0, 0, " de abril", False)
+    assert a._partes_do_numero("19 de abril de 2011")[4] is False
+    assert a._partes_do_numero("14/04")[4] is False
+    # quantidade com unidade continua contando
+    assert a._partes_do_numero("2 anos")[4] is True
+    assert a._partes_do_numero("1.500 km")[4] is True
+    assert a._partes_do_numero("40 de abril")[4] is True
+
+
 # --------------------------------------------------------------------------------------------- complemento das fotos
 
 def test_estrutura_so_manda_ao_modelo_o_que_tem_o_que_desenhar():

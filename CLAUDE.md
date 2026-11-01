@@ -530,6 +530,20 @@ se a frase dela tiver estrutura e nota alta (`imagens._motion_antes_da_ia` com `
 - **Gravação**: `hyperframes check`, MP4, um pedaço por cena (`midia/NNNN_anim.mp4`), `fonte: animation_ai`; a foto
   fica em `anim_reserva` (`--desfazer` volta e marca `anim_falhou`, que não tenta de novo na mesma fala). Reprovou ou
   falhou: a cena fica com a foto. Nunca para o vídeo.
+- **A cena animada sempre mostra o assunto, e sem bolinha de contagem** (pedido do usuário em 2026-11-01: "mesmo
+  sendo texto, deve ter alguma imagem para apresentar o assunto do roteiro, às vezes é só borrão sem nem texto" e
+  "essas bolinhas de contagem 1, 2, 3 ou 4, pode deletar, inútil"). Três mudanças:
+  - **Cada cartão busca a própria foto** (`fotos_dos_itens(..., buscar_todos=True)`, ligado por `fotos_impacto`):
+    cada cena empresta a foto a um item só, então o item que perdia a vez ficava num cartão de texto, sem nada do
+    assunto. Agora ele busca nos bancos (`_foto_do_banco`, com os mesmos filtros de espécie e de assunto).
+  - **Fundo do banco quando nenhuma cena do trecho tem foto** (fim de `fotos_impacto`): antes a cena animada saía
+    como texto sobre fundo liso. A busca é pelo pedido da cena, e o crédito vai para o `creditos.txt`.
+  - **Menos véu e menos desfoque sobre a foto do fundo** (`motor_impacto.js`, `.escuro` e `.escuro.forte` no
+    `motor_impacto.css`): o desfoque caiu de 8 para 5 (16 para 10 no herói) e o véu de .55 para .38, porque a foto
+    virava um borrão escuro atrás do cartão. Os títulos que ficam sobre o fundo ganharam `sombra-txt` para o
+    contraste seguir passando — os 30 layouts passam no `hyperframes check` (`--catalogo`).
+  - **Sem o selo numerado** (`simboloDe`, `numerado` e a classe `.contador` saíram): lista, passos, ranking e pilha
+    de cartões não levam mais 1, 2, 3; só a marca que diz alguma coisa (✓, ✕, ★, !). **Não trazer de volta.**
 - **Foto em cada item** (`fotos_dos_itens`, pedido do usuário em 2026-10-11: "mostrar cenas do banco de imagens
   junto com esses motion, para as palavras não ficarem soltas"; a lista do ninho, da castanheira e da sumaúma era só
   texto). Em lista, checklist e destaques, a foto da coisa citada entra junto com o item, numa pilha de fotos soltas à

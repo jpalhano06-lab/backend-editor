@@ -646,8 +646,22 @@ def planejar(projeto, itens, log=print, forcar=False) -> dict:
 
 # ------------------------------------------------------------------------------------------------ tempos e sons
 
+_MESES = ("janeiro", "fevereiro", "março", "marco", "abril", "maio", "junho", "julho", "agosto",
+          "setembro", "outubro", "novembro", "dezembro", "january", "february", "march", "april",
+          "may", "june", "july", "august", "september", "october", "november", "december")
+# dia do mês não é quantidade: "14 de abril" contando subindo mostrou "4 de abril" e "6 de abril" na tela
+# (cena 4 do davy, 2026-10-31), três datas erradas antes de parar na certa
+_DATA = re.compile(r"^\s*(?:(?:de\s+|/|-|\.)?\s*(?:%s)\b|[/-]\s*\d{1,2}(?:[/-]\d{2,4})?\s*$)"
+                   % "|".join(_MESES), re.IGNORECASE)
+
+
+def _e_data(numero, casas, sufixo):
+    """'14 de abril', '19 de abril de 2011' e '14/04': dia do mês, que não conta subindo."""
+    return casas == 0 and 1 <= numero <= 31 and bool(_DATA.match(sufixo))
+
+
 def _partes_do_numero(valor):
-    """'R$ 2,5 bilhões' -> ('R$ ', 2.5, 1, ' bilhões', True). Ano sozinho não conta subindo."""
+    """'R$ 2,5 bilhões' -> ('R$ ', 2.5, 1, ' bilhões', True). Ano e data não contam subindo."""
     m = re.match(r"^(\D*?)(\d[\d.]*(?:,\d+)?)(.*)$", str(valor or "").strip())
     if not m:
         return "", None, 0, str(valor or ""), False
@@ -658,7 +672,7 @@ def _partes_do_numero(valor):
     except ValueError:
         return "", None, 0, str(valor), False
     ano = casas == 0 and 1000 <= n <= 2100 and not sufixo.strip() and "." not in numero
-    return prefixo, n, casas, sufixo, not ano
+    return prefixo, n, casas, sufixo, not (ano or _e_data(n, casas, sufixo))
 
 
 # a tela nunca fica só com o fundo esperando a palavra: no leite, o fato e o causa_efeito esperavam até 2,5 s e o
@@ -1144,7 +1158,7 @@ def _combina(item, mostra) -> int:
     return sum(1 for r in radicais if r in mostra)
 
 def fotos_dos_itens(projeto, trecho, tipo, dados, ini, pasta, log=print, com_foto=COM_FOTO,
-                    minimo=MINIMO_DE_FOTOS, exigir_combina=False) -> dict:
+                    minimo=MINIMO_DE_FOTOS, exigir_combina=False, buscar_todos=False) -> dict:
     """Põe em cada item (dados["itens"]) a foto da coisa que ele cita: a da cena em que a palavra do item é falada,
     ou uma dos bancos. Cada cena empresta a foto a um item só. Devolve {número da cena: [créditos]} das fotos que
     entram na tela durante cada cena."""
@@ -1189,6 +1203,20 @@ def fotos_dos_itens(projeto, trecho, tipo, dados, ini, pasta, log=print, com_fot
                 continue
         usadas.add(f"{foto[1].get('fonte')}:{foto[1].get('id')}")
         achadas.append((it, arquivo, foto[1], cena["n"]))
+    # cada cena empresta a foto a um item só, então o item que perdeu a vez ficava num cartão de texto, sem nada do
+    # assunto na tela (pedido do usuário em 2026-11-01: "mesmo sendo texto, deve ter alguma imagem para apresentar o
+    # assunto"). Ele busca a própria foto nos bancos, com os mesmos filtros
+    if buscar_todos:
+        com_foto_ja = {id(it) for it, *_ in achadas}
+        for it in itens:
+            if id(it) in com_foto_ja:
+                continue
+            cena = cena_do(it)
+            foto = _foto_do_banco(projeto, pasta, cena, it, usadas, log)
+            if foto is None:
+                continue
+            usadas.add(f"{foto[1].get('fonte')}:{foto[1].get('id')}")
+            achadas.append((it, foto[0], foto[1], cena["n"]))
     if len(achadas) < min(minimo, len(itens)):
         return {}
     creditos = {}
@@ -1205,7 +1233,7 @@ def fotos_impacto(projeto, trecho, tipo, dados, ini, pasta, log=print) -> dict:
     # no impacto cada cartão é a sua foto: a que achou entra, mesmo sozinha (com o mínimo de 2, a foto achada para
     # "Interrompe circulação" se perdia e os dois cartões da cena 71 do brasil-selvagem saíam vazios)
     creditos = fotos_dos_itens(projeto, trecho, tipo, dados, ini, pasta, log, com_foto=COM_FOTO_IMPACTO, minimo=1,
-                               exigir_combina=True)
+                               exigir_combina=True, buscar_todos=True)
     if tipo in ("comparar", "antes_depois", "deslizar"):
         lados = [dados.get(k) for k in (("esq", "dir") if tipo == "comparar" else ("antes", "depois"))]
         if all(isinstance(l, dict) for l in lados):
@@ -1237,6 +1265,18 @@ def fotos_impacto(projeto, trecho, tipo, dados, ini, pasta, log=print) -> dict:
                 melhor = max(itens, key=lambda it: (_combina(it, mostra), -itens.index(it)))
                 if _combina(melhor, mostra):
                     melhor["foto"], melhor["foto_id"] = dados["fundo"], dados["fundo_id"]
+            break
+    if not dados.get("fundo"):
+        # nenhuma cena do trecho tem foto: o fundo vem do banco, pelo pedido da cena. Sem ele a cena animada era só
+        # texto sobre um fundo liso, sem nada do assunto do roteiro
+        usadas = _usadas_no_video(projeto)
+        for c in trecho:
+            achada = _foto_do_banco(projeto, pasta, c, {"texto": str(c.get("texto") or "")}, usadas, log)
+            if achada is None:
+                continue
+            dados["fundo"] = achada[0].relative_to(pasta).as_posix()
+            dados["fundo_id"] = f"{achada[1].get('fonte')}:{achada[1].get('id')}"
+            creditos.setdefault(c["n"], []).append(achada[1])
             break
     return creditos
 
