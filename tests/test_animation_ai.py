@@ -291,3 +291,21 @@ def test_titulo_traduzido_de_uma_palavra_e_recusado():
     for titulo in ("The Test", "Very average", "Ten supermarkets"):
         assert not a._outra_lingua([titulo], fala), titulo
     assert not a._outra_lingua(["O que mais importa"], "o que mais importa é a qualidade de cada frango assado")
+
+
+def test_nao_desfaz_animacao_que_deixaria_a_cena_vazia(tmp_path):
+    # as cenas 55 e 56 do animacoes-serra-5min nunca tiveram foto: o plano guardado não passou mais na conferência,
+    # a animação foi desfeita e o render parou com "Faltam imagens ou vídeos de 2 cenas"
+    class Proj:
+        def imagem(self, n):
+            return tmp_path / f"{n:04d}.png"
+
+    p = Proj()
+    (tmp_path / "0007.png").write_bytes(b"x")
+    sem_nada = {"n": 55, "anim_reserva": {"midia": None}}
+    com_foto = {"n": 56, "anim_reserva": {"midia": {"arquivo": "midia/0056.jpg"}}}
+    com_imagem = {"n": 7, "anim_reserva": {"midia": None}}
+    assert a._ficaria_vazia(p, sem_nada)
+    assert not a._ficaria_vazia(p, com_foto)
+    assert not a._ficaria_vazia(p, com_imagem)
+    assert a._ficaria_vazia(p, {"n": 55})          # sem anim_reserva nenhuma

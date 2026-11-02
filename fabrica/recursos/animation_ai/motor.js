@@ -186,10 +186,13 @@
       const itens = s.itens || [], n = itens.length;
       const y0 = cabeca(140) + 20, passo = Math.min(126, (790 - y0) / Math.max(1, n));
       pilha(itens);
+      // sem bolinha de contagem (1, 2, 3): só a marca que diz alguma coisa, como no motor do impacto
+      const cor = s.marca && { errado: "var(--verm)", alerta: "var(--acc)", estrela: "var(--acc)", certo: "var(--ok)" }[s.marca];
+      const recuo = cor ? 120 : 0;
       itens.forEach((it, i) => {
         const linha = cria(`<div style="position:absolute;left:160px;top:${y0 + i * passo}px;width:${LARG}px;display:flex;gap:30px;align-items:center"></div>`);
-        cria(`<div class="selo">${i + 1}</div>`, linha);
-        cria(`<div data-fit="${LARG - 120},${passo - 12},24" style="font:700 ${n > 4 ? 40 : 48}px var(--f-txt);line-height:1.2;width:${LARG - 120}px">${rico(it.texto)}</div>`, linha);
+        if (cor) cria(icone(s.marca, 64, cor), linha);
+        cria(`<div data-fit="${LARG - recuo},${passo - 12},24" style="font:700 ${n > 4 ? 40 : 48}px var(--f-txt);line-height:1.2;width:${LARG - recuo}px">${rico(it.texto)}</div>`, linha);
         entra(linha, it.t, "esquerda", 0.45);
       });
     },
@@ -215,8 +218,8 @@
       itens.forEach((it, i) => {
         const x = x0 + i * (w + vao), forte = i === s.destaque;
         const card = cria(`<div class="card" style="left:${x}px;top:${y0}px;width:${w}px;height:320px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:26px;text-align:center;border:3px solid ${forte ? "var(--acc)" : "var(--linha)"}"></div>`);
-        cria(`<div class="num" style="font-size:84px;color:var(--acc)">${i + 1}</div>`, card);
-        cria(`<div data-fit="${w - 52},170,22" style="font:700 32px var(--f-txt);line-height:1.22;width:${w - 52}px">${rico(it.texto)}</div>`, card);
+        // sem o número do passo: a seta entre os cartões já diz a ordem
+        cria(`<div data-fit="${w - 52},240,22" style="font:700 36px var(--f-txt);line-height:1.22;width:${w - 52}px">${rico(it.texto)}</div>`, card);
         entra(card, it.t, "escala", 0.5);
         if (i < n - 1) entra(cria(`<div style="position:absolute;left:${x + w + 4}px;top:${y0 + 140}px;width:38px;height:38px">${icone("seta", 38, "var(--mut)")}</div>`), it.t + 0.25, "surge", 0.3);
       });
@@ -373,8 +376,8 @@
       itens.forEach((it, i) => {
         const forte = i === s.destaque;
         const linha = cria(`<div style="position:absolute;left:160px;top:${y0 + i * passo}px;width:1600px;height:${passo - 18}px;border-radius:20px;display:flex;gap:34px;align-items:center;padding:0 34px;background:${forte ? "var(--acc)" : "var(--painel)"};color:${forte ? "var(--tinta)" : "var(--txt)"};border:1px solid var(--linha)"></div>`);
-        cria(`<div class="num" style="flex:none;width:110px;font-size:${Math.min(64, passo - 40)}px">${i + 1}º</div>`, linha);
-        cria(`<div data-fit="1380,${passo - 30},22" style="font:700 44px var(--f-txt);line-height:1.15;width:1380px">${rico(it.texto)}</div>`, linha);
+        // sem a posição numerada: a ordem das faixas e o destaque já dizem quem está na frente
+        cria(`<div data-fit="1490,${passo - 30},22" style="font:700 44px var(--f-txt);line-height:1.15;width:1490px">${rico(it.texto)}</div>`, linha);
         entra(linha, it.t, forte ? "impacto" : "direita", forte ? 0.38 : 0.45);
       });
     },
@@ -608,6 +611,28 @@
   };
 
   // ------------------------------------------------------------------------------------------------- montar e mover
+  // a foto do assunto atrás de tudo (s.fundo): a cena animada sempre mostra o assunto do roteiro, mesmo sendo só
+  // texto. Sem ela o estilo escuro saía como tela preta com uma linha de texto (cenas 42 a 46 e 96 a 105 do
+  // animacoes-serra-5min). A camada do estilo entra por cima, translúcida: as cores e o contraste seguem os do tema
+  const FOTO = s.fundo ? String(s.fundo) : "";
+  // quanto da cor do estilo cobre a foto (o tema pode mudar com _veu). Medido no hyperframes check: no misterio o
+  // destaque da cena 46 tirou 1,7 de contraste com 0,68 e 2,5 com 0,78, e passa com 0,86. O estilo de fundo claro
+  // precisa de mais, porque a foto clara encosta na cor do texto escuro (o "Soja" do riso, 2,68 com 0,86)
+  const CLARO = (() => {
+    const m = /^#?([0-9a-f]{6})$/i.exec(css("fundo"));
+    if (!m) return false;
+    const n = parseInt(m[1], 16);
+    return 0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255) > 140;
+  })();
+  const VEU = typeof E.veu === "number" ? E.veu : (CLARO ? 0.93 : 0.86);
+  if (FOTO) {
+    root.style.setProperty("--veu", String(VEU));   // o mesmo véu no canvas (VEU) e na camada de CSS (.fundo.com-foto)
+    // no estilo claro a foto é clareada antes do véu: o texto é escuro, e um trecho escuro da foto por baixo derruba
+    // o contraste mesmo com 7% aparecendo (o "Soja" do riso caiu a 2,93 com véu de 0,93)
+    const b = cria(`<div class="foto-fundo${CLARO ? " clara" : ""}" ${PERMITE}><img alt="" src="${esc(FOTO)}"></div>`);
+    const img = b.querySelector("img");
+    passos.push(t => { img.style.transform = `scale(${(1.08 + 0.12 * lim(t / DUR)).toFixed(4)})`; });
+  }
   // o fundo: nos 4 estilos de antes, as camadas de CSS de sempre; nos novos, um canvas desenhado a cada quadro
   if (E.fundo) {
     const CW = Math.round(1920 * 1.3), CH = Math.round(1080 * 1.3), OX = (CW - 1920) / 2, OY = (CH - 1080) / 2;
@@ -676,11 +701,14 @@
       },
     };
     passos.push(t => {
-      c.globalCompositeOperation = "source-over"; c.globalAlpha = 1; c.fillStyle = cor.f; c.fillRect(0, 0, CW, CH);
+      c.globalCompositeOperation = "source-over"; c.globalAlpha = 1;
+      // com a foto atrás, a cor do estilo entra como véu e deixa o assunto aparecer; sem ela, cobre como sempre
+      if (FOTO) c.clearRect(0, 0, CW, CH);
+      c.globalAlpha = FOTO ? VEU : 1; c.fillStyle = cor.f; c.fillRect(0, 0, CW, CH); c.globalAlpha = 1;
       (FUNDOS[E.fundo] || FUNDOS.filme)(t);
     });
   } else {
-    cria('<div class="fundo"></div>');
+    cria(`<div class="fundo${FOTO ? " com-foto" : ""}"></div>`);
     cria('<div class="pontos"></div>');
   }
   if (A.canal) root.appendChild(Object.assign(document.createElement("div"), { className: "canal", innerHTML: `<i></i>${esc(A.canal)}` }));

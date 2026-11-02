@@ -1267,18 +1267,44 @@ def fotos_impacto(projeto, trecho, tipo, dados, ini, pasta, log=print) -> dict:
                     melhor["foto"], melhor["foto_id"] = dados["fundo"], dados["fundo_id"]
             break
     if not dados.get("fundo"):
-        # nenhuma cena do trecho tem foto: o fundo vem do banco, pelo pedido da cena. Sem ele a cena animada era só
-        # texto sobre um fundo liso, sem nada do assunto do roteiro
-        usadas = _usadas_no_video(projeto)
-        for c in trecho:
-            achada = _foto_do_banco(projeto, pasta, c, {"texto": str(c.get("texto") or "")}, usadas, log)
-            if achada is None:
-                continue
-            dados["fundo"] = achada[0].relative_to(pasta).as_posix()
-            dados["fundo_id"] = f"{achada[1].get('fonte')}:{achada[1].get('id')}"
-            creditos.setdefault(c["n"], []).append(achada[1])
-            break
+        _fundo_do_banco(projeto, trecho, dados, pasta, creditos, log)
     return creditos
+
+
+def _fundo_do_banco(projeto, trecho, dados, pasta, creditos, log=print) -> bool:
+    """Nenhuma cena do trecho tem foto: o fundo vem do banco, pelo pedido da cena. Sem ele a cena animada era só
+    texto sobre um fundo liso, sem nada do assunto do roteiro."""
+    usadas = _usadas_no_video(projeto)
+    for c in trecho:
+        achada = _foto_do_banco(projeto, pasta, c, {"texto": str(c.get("texto") or "")}, usadas, log)
+        if achada is None:
+            continue
+        dados["fundo"] = achada[0].relative_to(pasta).as_posix()
+        dados["fundo_id"] = f"{achada[1].get('fonte')}:{achada[1].get('id')}"
+        creditos.setdefault(c["n"], []).append(achada[1])
+        return True
+    return False
+
+
+def fundo_da_cena(projeto, trecho, dados, pasta, creditos, log=print) -> bool:
+    """O fundo dos estilos que não são o impacto: a foto que alguma cena do trecho já tinha e, sem nenhuma, uma do
+    banco. A cena animada sempre mostra o assunto, em qualquer estilo (pedido do usuário em 2026-11-01): sem isso, no
+    misterio e no cinema a tela saía praticamente preta com uma linha de texto (animacoes-serra-5min, cenas 42 a 46 e
+    96 a 105). O impacto monta o fundo em fotos_impacto, que ainda escolhe o cartão de cada item."""
+    for c in trecho:
+        foto = _foto_da_cena(projeto, c)
+        if foto is None:
+            continue
+        arquivo = pasta / "assets" / "fotos" / f"fundo_{c['n']:04d}.jpg"
+        duracao = (_o_que_a_cena_tinha(c).get("midia") or {}).get("duracao")
+        if not _preparar_foto(foto[0], arquivo, foto[1].get("tipo") == "video", duracao):
+            continue
+        dados["fundo"] = arquivo.relative_to(pasta).as_posix()
+        dados["fundo_id"] = f"{foto[1].get('fonte')}:{foto[1].get('id')}"
+        if dados["fundo_id"] not in {f"{x.get('fonte')}:{x.get('id')}" for x in creditos.get(c["n"], [])}:
+            creditos.setdefault(c["n"], []).append(foto[1])
+        return True
+    return _fundo_do_banco(projeto, trecho, dados, pasta, creditos, log)
 
 
 def trechos_animados(cenas) -> list:
@@ -1346,6 +1372,15 @@ def _pasta_para_gravar(projeto, numeros):
             return pasta
         k += 1
 
+def _ficaria_vazia(cena_projeto, c) -> bool:
+    """Desfazer a animação desta cena a deixaria sem nada na tela: o que ela tinha antes (anim_reserva) não tem
+    arquivo e não existe imagem numerada dela. Cena vazia trava o render."""
+    antes = c.get("anim_reserva") or {}
+    if (antes.get("midia") or {}).get("arquivo"):
+        return False
+    return not cena_projeto.imagem(c["n"]).exists()
+
+
 def _planos_conferidos(projeto, pares, todas, log=print) -> list:
     """Os planos guardados passam de novo pela conferência antes de regravar: a regra pode ter ficado mais exigente
     depois (os títulos em português "O Teste", "Avaliação" num roteiro em inglês, everything-you-need-to-answer). O
@@ -1370,6 +1405,13 @@ def _planos_conferidos(projeto, pares, todas, log=print) -> list:
             # a animação reprovada (texto em outra língua, palavra que a fala não diz) é pior que a foto: a cena volta ao
             # que tinha antes dela (cena 242 do everything-you-need-to-answer, "Pilares da reputação")
             numeros = {c["n"] for c in g}
+            # ...mas só quando há o que mostrar no lugar: desfazer uma animação de cena que nunca teve foto deixa a
+            # cena VAZIA e o render para ("Faltam imagens de 2 cenas", 55 e 56 do animacoes-serra-5min). O clipe de
+            # antes é pior que o plano novo e melhor que nada: ele fica, e a cena segue no vídeo
+            if any(_ficaria_vazia(projeto, c) for c in g):
+                log(f"  animation-ai: o plano novo da cena {g[0]['n']} também não passa, e ela não tem foto para voltar; "
+                    "fica com a animação que já estava no vídeo")
+                continue
             desfazer(projeto, numeros)
             with _TRAVA_CENAS:
                 dados = projeto.ler_json("cenas.json")
@@ -1534,6 +1576,7 @@ def gravar(projeto, trecho, plano, log=print, exigir_imagem=False):
         eventos = sons_impacto(tipo, resolvidos, dur)  # o motor do impacto mexe em outros momentos que o motor.js
     else:
         creditos = fotos_dos_itens(projeto, trecho, tipo, resolvidos, ini, pasta, log)
+        fundo_da_cena(projeto, trecho, resolvidos, pasta, creditos, log)
     if exigir_imagem and not tem_imagem(resolvidos):
         raise SemImagem("nenhuma foto para a cena animada: só texto não entra no vídeo")
     variante = trecho[0]["n"]
