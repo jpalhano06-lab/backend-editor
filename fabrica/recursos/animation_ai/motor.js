@@ -174,12 +174,28 @@
       const tv = T(s.t, 0.3), y = s.legenda ? 210 : 320;
       const anel = cria('<div style="position:absolute;left:660px;top:' + (y - 90) + 'px;width:600px;height:600px;border-radius:50%;border:3px solid var(--acc);opacity:0"></div>');
       passos.push(t => { const p = lim((t - tv) / 0.9); anel.style.opacity = p > 0 && p < 1 ? (1 - p) * 0.5 : 0; anel.style.transform = `scale(${0.5 + p * 0.9})`; });
-      const linha = cria(`<div class="num" data-fit="1640,300,90" style="position:absolute;left:140px;top:${y}px;width:1640px;text-align:center;font-size:260px;color:var(--acc)"></div>`);
-      linha.innerHTML = `${esc(s.prefixo || "")}<span class="contagem">${esc(s.valor || "")}</span>${esc(s.sufixo || "")}`;
+      // unidade comprida ("milhões de toneladas") não cabe ao lado do número nem encolhendo até o mínimo: ela desce
+      // para uma linha própria, menor, como numa ficha de dado (cena 1 do animacoes-serra-5min)
+      const longa = String(s.sufixo || "").trim().length > 12, alt = longa ? 200 : 300;
+      const linha = cria(`<div class="num" data-fit="1640,${alt},80" style="position:absolute;left:140px;top:${y}px;width:1640px;text-align:center;font-size:${longa ? 200 : 260}px;color:var(--acc)"></div>`);
+      linha.innerHTML = `${esc(s.prefixo || "")}<span class="contagem">${esc(s.valor || "")}</span>`
+        + (longa ? "" : `<span class="unidade">${esc(s.sufixo || "")}</span>`);
+      if (longa) {
+        const sob = cria(`<div class="unidade" data-fit="1560,110,26" style="position:absolute;left:180px;top:${y + alt + 20}px;width:1560px;text-align:center;font:800 76px var(--f-txt);line-height:1.1;color:var(--acc)">${esc(String(s.sufixo || "").trim())}</div>`);
+        entra(sob, tv + 0.15, "sobe", 0.45);
+      }
       entra(linha, tv, "impacto");
-      if (s.contar && typeof s.numero === "number") conta(linha.querySelector(".contagem"), s.numero, s.casas || 0, tv, 1.1);
-      if (s.legenda) entra(cria(`<div data-fit="1560,150,28" style="position:absolute;left:180px;top:${y + 330}px;width:1560px;text-align:center;font:700 54px var(--f-txt);line-height:1.2">${rico(s.legenda)}</div>`), T(s.t_legenda, tv + 0.5));
-      if (s.nota) entra(cria(`<div class="mut" data-fit="1500,80,22" style="position:absolute;left:210px;top:${y + 490}px;width:1500px;text-align:center;font:500 32px var(--f-txt)">${rico(s.nota)}</div>`), T(s.t_nota, tv + 1.0));
+      if (s.contar && typeof s.numero === "number") {
+        const conta_ = linha.querySelector(".contagem");
+        conta(conta_, s.numero, s.casas || 0, tv, 1.1);
+        // a unidade acompanha o número enquanto ele sobe: contando até "2 anos", a tela mostrava "1 anos"
+        if (s.sufixo_um && s.sufixo_um !== s.sufixo) {
+          const uni = linha.querySelector(".unidade");
+          passos.push(() => { uni.textContent = conta_.textContent.trim() === "1" ? s.sufixo_um : (s.sufixo || ""); });
+        }
+      }
+      if (s.legenda) entra(cria(`<div data-fit="1560,150,28" style="position:absolute;left:180px;top:${y + (longa ? 370 : 330)}px;width:1560px;text-align:center;font:700 54px var(--f-txt);line-height:1.2">${rico(s.legenda)}</div>`), T(s.t_legenda, tv + 0.5));
+      if (s.nota) entra(cria(`<div class="mut" data-fit="1500,80,22" style="position:absolute;left:210px;top:${y + (longa ? 530 : 490)}px;width:1500px;text-align:center;font:500 32px var(--f-txt)">${rico(s.nota)}</div>`), T(s.t_nota, tv + 1.0));
     },
 
     lista() {
@@ -322,7 +338,9 @@
 
     destaques() {
       const itens = s.itens || [], n = Math.max(1, itens.length);
-      const marca = s.marca || "errado", cor = marca === "estrela" ? "var(--acc)" : marca === "certo" ? "var(--ok)" : "var(--verm)";
+      // sem marca dita, a estrela: o ✕ vermelho era o padrão e saía em cima de atributo POSITIVO ("Fogo", "Carne",
+      // "Cultivado com paciência", cenas 36 e 105 do animacoes-serra-5min). O ✕ só quando o modelo pede de propósito
+      const marca = s.marca || "estrela", cor = marca === "estrela" ? "var(--acc)" : marca === "certo" ? "var(--ok)" : "var(--verm)";
       const y0 = cabeca(140) + 30, passo = Math.min(150, (790 - y0) / n);
       pilha(itens);
       itens.forEach((it, i) => {

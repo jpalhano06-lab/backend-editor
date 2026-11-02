@@ -660,17 +660,47 @@ def _e_data(numero, casas, sufixo):
     return casas == 0 and 1 <= numero <= 31 and bool(_DATA.match(sufixo))
 
 
+# a unidade no singular, para o número que conta subindo não mostrar "1 anos" no caminho até "2 anos" (cena 85 do
+# animacoes-serra-5min). Só as irregulares precisam de tabela; o resto é tirar o "s" do fim
+_SINGULAR = {"meses": "mês", "milhões": "milhão", "bilhões": "bilhão", "milhares": "mil", "reais": "real",
+             "países": "país", "mulheres": "mulher", "homens": "homem", "pessoas": "pessoa", "vezes": "vez"}
+
+
+def _singular(sufixo) -> str:
+    """' anos' -> ' ano'. Devolve o sufixo como está quando não é plural de palavra (' %', ' km/h')."""
+    texto = str(sufixo or "")
+    m = re.match(r"^(\W*)([^\W\d_]+)(.*)$", texto, re.UNICODE)
+    if not m:
+        return texto
+    antes, palavra, depois = m.groups()
+    baixa = palavra.lower()
+    if baixa in _SINGULAR:
+        uma = _SINGULAR[baixa]
+    elif len(baixa) > 3 and baixa.endswith("s") and not baixa.endswith("ss"):
+        uma = palavra[:-1]
+    else:
+        return texto
+    if palavra.isupper():
+        uma = uma.upper()
+    elif palavra[:1].isupper():
+        uma = uma.capitalize()
+    return f"{antes}{uma}{depois}"
+
+
 def _partes_do_numero(valor):
     """'R$ 2,5 bilhões' -> ('R$ ', 2.5, 1, ' bilhões', True). Ano e data não contam subindo."""
     m = re.match(r"^(\D*?)(\d[\d.]*(?:,\d+)?)(.*)$", str(valor or "").strip())
     if not m:
-        return "", None, 0, str(valor or ""), False
+        # sem número nenhum o texto inteiro fica no valor, NUNCA no sufixo: o motor desenha prefixo+valor+sufixo, e
+        # com o texto nos dois saía "centavoscentavos" e "uma fortunauma fortuna" (cenas 31 e 32 do
+        # animacoes-serra-5min, 2026-11-02)
+        return "", None, 0, "", False
     prefixo, numero, sufixo = m.groups()
     casas = len(numero.split(",")[1]) if "," in numero else 0
     try:
         n = float(numero.replace(".", "").replace(",", "."))
     except ValueError:
-        return "", None, 0, str(valor), False
+        return "", None, 0, "", False
     ano = casas == 0 and 1000 <= n <= 2100 and not sufixo.strip() and "." not in numero
     return prefixo, n, casas, sufixo, not (ano or _e_data(n, casas, sufixo))
 
@@ -744,6 +774,7 @@ def resolver_tempos(tipo, dados, palavras, dur):
         d["t_legenda"] = round(min(d["t"] + 0.9, fim), 3)
     if tipo == "numero":
         d["prefixo"], d["numero"], d["casas"], d["sufixo"], d["contar"] = _partes_do_numero(d.get("valor"))
+        d["sufixo_um"] = _singular(d["sufixo"])
         if d["numero"] is not None:
             d["valor"] = "0" if d["contar"] else re.sub(r"^\D*?(\d[\d.]*(?:,\d+)?).*$", r"\1", str(dados.get("valor")))
         d["t_legenda"] = round(min(d["t"] + 0.5, fim), 3)
@@ -1386,12 +1417,17 @@ def _planos_conferidos(projeto, pares, todas, log=print) -> list:
     depois (os títulos em português "O Teste", "Avaliação" num roteiro em inglês, everything-you-need-to-answer). O
     reprovado é pedido de novo ao modelo; sem plano novo que passe, a cena fica com a animação de antes."""
     saida = []
+    # a posição real do trecho: conferido sempre como "não é o primeiro", o plano de abertura da PRIMEIRA animação do
+    # vídeo era reprovado por "'abertura' só no primeiro trecho", e a cena 1 do animacoes-serra-5min perdia a abertura
+    # certa para um plano pior a cada regravação
+    comeco = min((min(c["n"] for c in grupo) for _, grupo in trechos_animados(todas)), default=None)
     for g, plano in pares:
         if plano.get("tipo") == "dirigida":
             saida.append((g, plano))
             continue
         item = _itens_util(projeto, [g], todas)[0]
-        problemas = conferir(plano["tipo"], plano["dados"], item["fala"], item["extras"], 1, 99,
+        posicao = 0 if comeco is not None and min(c["n"] for c in g) == comeco else 1
+        problemas = conferir(plano["tipo"], plano["dados"], item["fala"], item["extras"], posicao, 99,
                              lingua=item.get("lingua"))
         if not problemas:
             saida.append((g, plano))

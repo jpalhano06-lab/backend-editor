@@ -309,3 +309,23 @@ def test_nao_desfaz_animacao_que_deixaria_a_cena_vazia(tmp_path):
     assert not a._ficaria_vazia(p, com_foto)
     assert not a._ficaria_vazia(p, com_imagem)
     assert a._ficaria_vazia(p, {"n": 55})          # sem anim_reserva nenhuma
+
+
+def test_valor_sem_numero_nao_sai_duplicado():
+    # "centavoscentavos" e "uma fortunauma fortuna" na tela: o texto ficava no valor E no sufixo, e o motor
+    # desenha prefixo+valor+sufixo (cenas 31 e 32 do animacoes-serra-5min)
+    assert a._partes_do_numero("centavos") == ("", None, 0, "", False)
+    assert a._partes_do_numero("uma fortuna") == ("", None, 0, "", False)
+    assert a._partes_do_numero("--") == ("", None, 0, "", False)
+
+
+def test_unidade_no_singular_para_a_contagem():
+    # contando até "2 anos", a tela mostrava "1 anos"
+    assert a._singular(" anos") == " ano"
+    assert a._singular(" meses") == " mês"
+    assert a._singular(" metros") == " metro"
+    assert a._singular(" milhões") == " milhão"
+    assert a._singular(" MESES") == " MÊS"
+    # o que não é plural de palavra fica como está
+    for igual in ("%", " km", " km/h", "", " de abril"):
+        assert a._singular(igual) == igual

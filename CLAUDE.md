@@ -574,6 +574,24 @@ se a frase dela tiver estrutura e nota alta (`imagens._motion_antes_da_ia` com `
   - **O `--regravar` respeita o `--tema`** (`cli.cmd_animation_ai`): o estilo não vem do plano guardado, vem da linha
     de comando, e ele era aplicado depois do bloco do regravar. Gravar de novo as cenas do misterio as devolvia em
     apple, sem ninguém pedir.
+- **Quatro defeitos achados vendo o vídeo pronto** (2026-11-02, de uma análise quadro a quadro do
+  `animacoes-serra-5min` que o usuário trouxe; todos do motor, nenhum do modelo):
+  - **Valor sem número saía duplicado** (`_partes_do_numero`): sem nenhum algarismo, ela devolvia o texto inteiro no
+    SUFIXO, e o `valor` ficava com o mesmo texto; o motor desenha prefixo+valor+sufixo e a tela mostrou
+    "centavoscentavos" e "uma fortunauma fortuna" (cenas 31 e 32). Sem número, o sufixo vem vazio.
+  - **A unidade acompanha o número que conta** (`_singular`, `sufixo_um`, `span.unidade` no `motor.js`): contando até
+    "2 anos" a tela mostrava "1 anos" (cena 85). "meses" -> "mês", "milhões" -> "milhão"; "%" e "km" ficam como estão.
+  - **O ✕ vermelho era o PADRÃO do `destaques`** (`motor.js`, `s.marca || "errado"`): o modelo não pede marca em
+    quase nenhuma cena, então "Fogo", "Carne", "Ferramenta" e "Cultivado com paciência" saíam marcados como erro
+    (cenas 36 e 105). O padrão virou a estrela; o ✕ só quando o modelo pede de propósito.
+  - **A abertura do vídeo era reprovada por não ser a abertura** (`_planos_conferidos`): o `--regravar` conferia todo
+    plano guardado com `posicao=1`, e a regra "'abertura' só no primeiro trecho" derrubava justamente a abertura
+    verdadeira; a cena 1 perdia o plano certo a cada regravação. A posição real vem de `trechos_animados`.
+  - Junto: **unidade comprida ganha linha própria** (`longa` no `numero` do `motor.js`), porque "milhões de
+    toneladas" não cabia ao lado do número nem encolhendo até o mínimo e reprovava no `text_box_overflow`.
+  - **O que ficou de fora:** foto que CONTRADIZ a fala ("nunca em pé" com facas em pé, "cachaça de alambique" com
+    uma garrafa de whisky). A foto das animações é escolhida pela cadeia de visão, mas ninguém julga se ela nega o
+    texto. Barrar por palavra-chave erraria muito; o caminho é o Jev julgar a foto da animação como julga a de cena.
 - **Foto em cada item** (`fotos_dos_itens`, pedido do usuário em 2026-10-11: "mostrar cenas do banco de imagens
   junto com esses motion, para as palavras não ficarem soltas"; a lista do ninho, da castanheira e da sumaúma era só
   texto). Em lista, checklist e destaques, a foto da coisa citada entra junto com o item, numa pilha de fotos soltas à
