@@ -14,8 +14,7 @@ Faça um passo de cada vez e confirme antes de seguir.
 4. **Claude da fábrica.** A divisão em cenas roda pela assinatura do Claude Code, com `claude -p`. Confirme que o terminal está logado. Se não estiver, peça para rodar `claude` e digitar `/login`.
 5. **Teste sem custo.** Rode o exemplo em modo offline, que usa a voz do computador (a do Mac; no Windows, a do sistema ou, sem ela, um tom baixo no lugar da fala) e imagens de teste. Só depois disso fale em gastar dinheiro.
 6. **Voz.** A narração usa as vozes open source do VoiceStudio e do voicebox, rodando dentro da fábrica (sem instalar os apps). Prepare os motores uma vez com `uv sync --project motores_voz/omnivoice` e `uv sync --project motores_voz/qwen` (uns 9 GB, na mesma pasta do projeto; os modelos baixam na primeira fala). Ajude a escolher a voz pela lista do editor (`GET /api/vozes/local`, com prévia) e ponha o código dela em `voz.voz_local` no perfil (`kokoro:pm_alex`, `qwen:Ryan`, `omnivoice:community_pt_br_lucas`, `omnivoice:female, middle-aged, low pitch`).
-7. **Juiz.** Quem julga se a imagem combina com a fala é o Laya, open source, rodando no próprio PC (sem chave e sem custo). Prepare uma vez com `uv sync --project motor_juiz/laya` (uns 750 MB de ambiente; os checkpoints baixam na primeira pergunta, uns 3 GB, na mesma pasta do projeto) e confira com `uv run fabrica juiz --testar`, que é grátis. Se ele não passar na aferição, a fábrica julga pela reserva sozinha e o vídeo sai igual: não é erro de instalação.
-8. **Perfil do canal.** Copie um perfil de `perfis/` com outro nome e ajuste voz, estilo das imagens, proporção de material real e diretrizes. Explique que o perfil é a identidade do canal.
+7. **Perfil do canal.** Copie um perfil de `perfis/` com outro nome e ajuste voz, estilo das imagens, proporção de material real e diretrizes. Explique que o perfil é a identidade do canal.
 
 ## Regras que valem sempre
 
@@ -47,9 +46,6 @@ uv run fabrica publicacao NOME    # título, descrição com capítulos, tags e 
 uv run fabrica thumbs NOME        # 3 thumbnails e a prancha do celular (grátis); --escolher N troca a capa
 uv run fabrica shorts NOME        # até 3 shorts cortados do vídeo pronto, com legenda palavra por palavra (grátis)
 uv run fabrica publicar NOME --simular   # o que subiria para o YouTube; sem --simular, publica (pede confirmação)
-uv run fabrica juiz --testar      # confere o juiz Laya que roda no seu PC: ele separa certo de errado? (grátis)
-uv run fabrica juiz --treinar     # treina o juiz nos julgamentos que a fábrica já pagou (grátis, no seu PC)
-uv run fabrica juiz --medir       # mede o juiz num vídeo que ele não viu (grátis)
 uv run fabrica consumo            # planilha do consumo no OpenRouter (relatorios/), refeita a cada consumo
 uv run fabrica tempos NOME        # onde foi o tempo da produção: etapas, cada IA, esperas e trocas de modelo (grátis)
 uv run fabrica animation-ai NOME  # onde a fala tem lista, datas ou comparação, cena animada no lugar da foto (grátis)
@@ -1162,100 +1158,7 @@ código dos dois apps foi copiado** (o VoiceStudio é AGPL); só os nomes das vo
   dos apps (`voicestudio`, `voicebox`) gravam na voz local. **O bloco já gravado e pago na GenAIPro continua valendo**
   (`narracao._mesma_voz`, marca `pagas_trocadas`): só bloco de texto novo é gravado na voz local.
 - A Fish (OpenRouter, grátis) segue valendo para quem escolher `provedor: fish`.
-### Treinar o juiz nas decisões que a fábrica já pagou
-
-`fabrica/laya_treino.py`, `fabrica juiz --montar-treino | --treinar | --medir`, pedido do usuário em 2026-11-01
-("sim, treinar") depois de medir que o Laya zero-shot não serve. Grátis e no próprio PC: nenhuma chamada de API.
-
-- **Os rótulos já existem e foram pagos uma vez.** Cada `projetos/*/cenas.json` guarda, por cena, o pedido do
-  diretor de arte, a fala, o que a imagem mostra (`legenda`, escrita por quem VIU a imagem) e a resposta do juiz
-  (`nota` e `sujeito`), em dois momentos: `captura` (antes de baixar) e `conferencia`. Medido nos 5 projetos
-  desta máquina: **610 pares** estado -> resposta.
-- **O estado é montado por `corrigir.estado_do_julgamento`**, extraída de `_julgar_com_jev` justamente para isso.
-  Dois construtores de estado desviariam um do outro e o juiz treinado aprenderia uma pergunta que a produção não
-  faz. As perguntas também são as da produção (`corrigir._perguntas`); só a de época fica fora, porque a
-  conferência não guarda rótulo dela.
-- **O alvo é a probabilidade do juiz, não um sim ou não** (`gold.probabilities`, com `--loss rlcd`, que é uma
-  regra de pontuação própria): a nota 85 vira 0,85 de "true". É destilação da calibração do Jev, que é o que a
-  fábrica lê (`nota >= 40` para manter, `nota_para_trocar` para trocar sozinha). Por isso **a faixa do meio entra**:
-  excluí-la de início jogava 137 dos 610 pares fora, e justo na região onde a fábrica decide.
-- **Negativos difíceis de graça** (`_cruzados`): o pedido de uma cena com a descrição da imagem de OUTRA cena, de
-  bloco e assunto sem relação, é negativo por construção — sem API e sem rótulo humano. É exatamente a falha
-  medida (o fundo verde de chroma tirando 100 e a árvore certa 12): zero-shot o modelo não aprendeu que "assunto
-  errado = falso". Os reais ensinam o sutil (a imagem genérica mas do sujeito certo, que a fábrica MANTÉM); os
-  cruzados ensinam o óbvio. O cruzamento compara os termos de assunto de TODOS os campos de uma cena contra os da
-  outra (`_termos_do_assunto`), não campo a campo: "lynx" no `animal` de uma e "Eurasian lynx" no `exato` da outra
-  passava por assuntos diferentes, e o "negativo" mostraria o bicho certo, ensinando o juiz ao contrário.
-- **Os cruzados não afogam os reais** (`_equilibrar`, `CRUZADOS_POR_REAL` 0,25): dá para gerar milhares deles, e
-  medido eram 918 contra 459 reais. Treinado nisso, o juiz aprende a reprovar tudo — o que separa bem num teste e,
-  na produção, manda **toda** cena para a imagem de IA paga. Todos os reais ficam; os cruzados entram só na medida
-  de ensinar o óbvio.
-- **O teste é um projeto inteiro, não um sorteio.** Cenas do mesmo vídeo repetem assunto, fala e pedido: um sorteio
-  deixaria quase toda cena de teste com uma parente no treino, a nota sairia boa e o juiz continuaria ruim no vídeo
-  seguinte, que é o que importa. O `laya-train` confere e confirmou **0 itens vazando** entre treino e teste.
-- **O checkpoint treinado é servido por nome, nunca por caminho** (`laya_local.checkpoint_treinado`,
-  `NOME_TREINADO`): um caminho no campo `model` do servidor volta 422. Com `laya.modelo` apontando para a pasta, a
-  fábrica registra o checkpoint em `LAYA_EXTRA_MODELS` e pergunta por `fabrica`; só ele é carregado, e a aferição
-  passa a medir ele.
-
 - Testes em `tests/test_voz_local.py` (catálogo, resolução de cada motor, voz inexistente, troca das pagas).
-
-## Juiz: o Laya open source no PC, no lugar do Jev pago
-
-`fabrica/laya_local.py`, `motor_juiz/laya`, pedido do usuário em 2026-11-01: "vamos substituir o JEV utilizado no
-openrouter pela opensource local LAYA", "instale o laya na nossa fábrica, e que fique útil para os meus clientes no
-github, funcionando no pc local deles" e "deve ser utilizado o laya como principal". O Laya
-(convaiinnovations/laya, Apache-2.0) é um motor de decisão tipada não-autorregressivo: não escreve texto, responde
-`noul`, `score` e `choice` com probabilidade calibrada, num passo só.
-
-- **É uma troca, não uma reescrita.** O `laya-serve` (extra `laya[serve]`) serve `POST /v1/systemone` com o **mesmo
-  protocolo do Jev**: `{"state": ..., "questions": ...}` e resposta `{"answers": {"combina": {"type": "noul",
-  "noul": 0.87}}, "usage": ...}`. As perguntas do Jev (`corrigir.PERGUNTAS_JEV`, `PERGUNTA_SUJEITO`,
-  `PERGUNTA_EPOCA`, `motion_ia.PERGUNTA_DADO`) vão **como estão**: nenhuma pergunta foi reescrita. Nenhum código do
-  Laya foi copiado — a fábrica instala o pacote do PyPI e fala com ele por HTTP.
-- **Cadeia de quem julga** (`jev.julgar_com`, por padrão `laya, jev, principal`): o Laya no PC, o Jev pago pelo
-  OpenRouter (pulado sem chave, sem nem tentar) e o modelo principal, que responde as mesmas perguntas em JSON.
-  Quem falhar **passa a vez na hora, sem dormir**: com centenas de cenas, esperar um servidor caído travava a
-  conferência. `FABRICA_JULGAR_COM=laya` vale só naquele processo, sem mexer no servidor no ar.
-- **O juiz é aferido antes de julgar um vídeo** (`laya_local.confiavel`, `aferir`, `cli.PROVA_DO_JUIZ`): 5 cenas
-  conhecidas que já deram errado no vídeo (pangolim x tatu, leão x elefante, mercado x fundo verde de chroma), de
-  graça, uma vez por computador (`motor_juiz/afericao.json`, chave = checkpoint + dispositivo + `VERSAO_PROVA`).
-  Passando por `SEPARACAO_MINIMA` (10 pontos entre a pior cena certa e a melhor cena errada), ele julga o vídeo
-  todo; não passando, **sai de lado e nenhuma cena passa por ele**. É a regra do resto da fábrica: preferível uma
-  cena julgada pela reserva a uma nota ao contrário.
-- **Medido em 2026-11-01: zero-shot ele NÃO separa a imagem certa da errada, e a fábrica usa a reserva.** Foram 15
-  enquadramentos (as perguntas longas de hoje e perguntas curtas, em português e em inglês, estado em dicionário e
-  em texto, `noul` e `score`) nos três checkpoints (`english`, `multilingual`, `typed-decisions`): **separação
-  negativa em todos**. O fundo verde de chroma — a imagem mais obviamente errada do conjunto — tirou 88 a 100,
-  enquanto a árvore certa tirou 12 e os leões certos 15 a 30; o `typed-decisions` dá 52 a 63 para tudo, certo e
-  errado, sem nenhum sinal. Não é enquadramento de pergunta: é o que o próprio README do Laya diz, 0,362 de
-  acurácia zero-shot nas decisões tipadas. **Não gaste tempo mexendo no texto das perguntas; já foi medido.**
-- **O que falta para ele assumir de verdade: o fine-tune nas decisões da fábrica.** O mesmo README mede 0,766
-  depois de treinar no próprio domínio (contra 0,362 zero-shot), e o repositório traz o `laya-train`, o notebook
-  (2xT4) e o script de CPU/MPS. Os dados de treino **a fábrica já tem, de graça e rotulados pelo juiz pago**: cada
-  `cenas.json` guarda, por cena, o estado que foi julgado e a resposta (`conferencia.nota`, `veredito`, `legenda`),
-  e os projetos antigos somam milhares desses pares. Treinado, o checkpoint vai em `laya.modelo` (um caminho de
-  pasta), a aferição passa sozinha e o Laya assume o lugar do Jev sem mais nenhuma mudança de código.
-- **Onde fica** (`motor_juiz/`, fora do Git): o ambiente `motor_juiz/laya/.venv`, os checkpoints em
-  `motor_juiz/modelos` (`HF_HOME`) e o registro em `motor_juiz/laya.log`. **Nada disso pode ir para o C:**, que
-  nesta máquina tem pouco espaço livre — é a mesma regra dos motores de voz. Medido: 744 MB de ambiente e 3,0 GB de checkpoints.
-- **Na CPU de propósito** (`laya.dispositivo: cpu`): a placa de vídeo fica para a narração local, as animações e o
-  render. Medido nesta máquina: 1,7 a 2,0 s por julgamento na CPU depois de o motor carregar (a primeira pergunta
-  leva uns 3 min, baixando e carregando o checkpoint). Quem tem placa sobrando troca o índice do torch em
-  `motor_juiz/laya/pyproject.toml` pelo `cu126` e põe `dispositivo: cuda`.
-- **O servidor sobe sozinho na primeira pergunta e sai sozinho** depois de `PARADO_PARA_DESLIGAR` (10 min) sem
-  ninguém perguntar, devolvendo a memória — como os motores de voz. `fabrica juiz [--testar] [--ligar]
-  [--desligar]` prepara, afere e fecha; o `--testar` é grátis e diz a separação em pontos.
-- **Custo zero, e registrado** (`uso_laya.json` por projeto, `custos_reais` e `fabrica tempos`): as chamadas
-  aparecem com `custo_usd: 0` e os segundos de cada uma, para comparar com o Jev pago. Ele não vai para o registro
-  central do OpenRouter, porque não passa por lá.
-- **Nunca para o vídeo:** motor não preparado, servidor que não sobe ou aferição reprovada não derrubam nada — a
-  cadeia cai na reserva. Um motor que não está de pé é tentado **uma vez por processo** (`jev_local._laya_desistiu`):
-  insistir em cada uma das 340 cenas travaria a conferência.
-- Testes em `tests/test_laya_juiz.py` e `tests/test_laya_treino.py` (a cadeia, o protocolo, a aferição, o custo
-  zero, nunca parar o vídeo, e o conjunto de treino: estado igual ao da produção, alvo de probabilidade, cruzados
-  de verdade e o teste separado por projeto), sem rede e sem motor. Se o juiz acerta é outra coisa, medida pelo
-  `fabrica juiz --testar` e pelo `--medir`, que rodam o modelo de verdade.
 
 ## Quem responde cada etapa
 
@@ -1403,7 +1306,7 @@ com o Edge dá um aviso claro (`narracao`) para trocar para a Fish no editor.
 | Escolha das fotos e vídeos do acervo (olha as miniaturas) | **o mais rápido** (pedido do usuário em 2026-10-10, site e TipLabs; `midia.modelos_visao`): Qwen 27B do Groq grátis (4 s por folha) e, quando ele lota, **direto** o Gemini 2.5 Flash-Lite pelo OpenRouter (6 s, US$ 0,0008), sem esperar o Groq (`midia.espera_pelo_gratis: 0`); Qwen 3.7 Flash de reserva (28 s, US$ 0,0002). Os gratuitos lentos (Dots 18 s, `openrouter/free` até 153 s, Nemotron Nano Omni até 12 min) ficaram só em `midia.visao_gratuitos`, para quem não pode pagar (thumbnails, Motion IA, `so_gratuitos`): qualquer gratuito na lista vem antes dos pagos. Medido em 20 cenas pelo caminho real: escolha em 21 s, descrição em 10 s. No site, o pago ainda pede o "Usar a API paga" uma vez por projeto e dia |
 | Descrição das imagens das cenas para o Jev (site e TipLabs) | **Gemini 3.1 Flash-Lite direto** (`descricao` no `config.yaml`, `corrigir._pelo_gemini`, pedido do usuário em 2026-10-10): sem pensar, imagem em resolução baixa, miniatura de 512 px, resposta até 600 tokens. Uns 930 tokens lidos e 150 escritos, 2,4 s. **A chave está no plano grátis do Google: 500 pedidos por dia**; esgotada, `gemini_local` deixa o modelo de lado até a hora que o aviso diz (`_volta_em`) e a cadeia de visão descreve (o Gemini 2.5, 3,4 s, US$ 0,0003). 16 descrições ao mesmo tempo (`corrigir.paralelo`; eram 4, o gargalo). O 2.5 Flash-Lite o Google não libera para chave nova (404), mas o OpenRouter tem |
 | Revisão do vídeo pronto | cadeia de visão (a mesma da escolha) |
-| Julgamento (a imagem combina com a fala?) | cadeia `jev.julgar_com`: o **Laya** no próprio PC (grátis, `fabrica/laya_local.py`), o **Jev** pago pelo OpenRouter e o **modelo principal**. Hoje o Laya não passa na aferição e quem julga é a reserva: veja a seção Juiz |
+| Julgamento (a imagem combina com a fala?) | Jev, pelo OpenRouter; se ele cair, o modelo principal julga |
 | Imagens de IA | GPT-5.4 Image 2 em qualidade baixa pelo OpenRouter (`openai/gpt-5.4-image-2`), padrão do perfil base |
 
 Cuidados com esse modelo, que já custaram erro:
