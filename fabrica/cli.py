@@ -1104,37 +1104,6 @@ def cmd_entregar(a):
     log(f"Pacote do cliente: {r['pacote']} ({r['pacote_mb']} MB). Vídeo guardado: {r['video']}")
 
 
-def cmd_mcp(a):
-    from . import mcp_servidor
-
-    if a.url_publica:
-        log(f"MCP da fábrica em {a.url_publica.rstrip('/')}/mcp, com senha por cliente (fabrica mcp-cliente criar NOME). "
-            f"Ouvindo em http://{a.host}:{a.porta}")
-    else:
-        log(f"MCP da fábrica em http://{a.host}:{a.porta}/mcp, sem senha, só nesta máquina (no Claude Code: claude mcp "
-            f"add --transport http fabrica http://{a.host}:{a.porta}/mcp)")
-    mcp_servidor.rodar(a.host, a.porta, a.url_publica or "")
-
-
-def cmd_mcp_cliente(a):
-    from . import clientes_mcp
-
-    if a.acao == "criar":
-        if not a.nome:
-            raise SystemExit("Diga o nome do cliente: fabrica mcp-cliente criar NOME")
-        token = clientes_mcp.criar(a.nome, a.por_dia)
-        url = (a.url or "https://SEU-MCP").rstrip("/")
-        log(f"Cliente {a.nome} criado ({a.por_dia} vídeo(s) por dia). O token aparece só agora; guarde e mande ao "
-            f"cliente:\n\n  {token}\n\nNo Claude Code dele:\n  claude mcp add --transport http fabrica {url}/mcp "
-            f"--header \"Authorization: Bearer {token}\"")
-    elif a.acao == "revogar":
-        log("revogado" if clientes_mcp.revogar(a.nome) else f"não achei o cliente {a.nome}")
-    else:
-        for c in clientes_mcp.listar():
-            log(f"{c['nome']:20} {'ativo' if c['ativo'] else 'revogado':8} hoje {c['hoje']}/{c['por_dia']}  "
-                f"total {c['total']}  desde {c['criado'][:10]}")
-
-
 def cmd_creditos(a):
     c = genaipro.conta()
     numero = lambda n: f"{n:,}".replace(",", ".")
@@ -1474,20 +1443,6 @@ def main():
     s.add_argument("--nome", help="outro nome para o projeto no servidor")
     s.add_argument("--substituir", action="store_true", help="troca o projeto de mesmo nome que já está no servidor")
     s.set_defaults(funcao=cmd_importar)
-
-    s = sub.add_parser("mcp", help="sobe o MCP da fábrica: o Claude Code do cliente manda o roteiro e pensa o vídeo")
-    s.add_argument("--porta", type=int, default=8092)
-    s.add_argument("--host", default="127.0.0.1")
-    s.add_argument("--url-publica", default="", help="a URL da internet (https://mcp.exemplo.com): liga a senha por "
-                   "cliente e os links de download")
-    s.set_defaults(funcao=cmd_mcp)
-
-    s = sub.add_parser("mcp-cliente", help="contas do MCP: criar (gera o token), listar, revogar")
-    s.add_argument("acao", choices=["criar", "listar", "revogar"])
-    s.add_argument("nome", nargs="?", default="")
-    s.add_argument("--por-dia", type=int, default=1, help="vídeos que a conta começa por dia")
-    s.add_argument("--url", default="", help="a URL pública do MCP, para montar o comando de instalação")
-    s.set_defaults(funcao=cmd_mcp_cliente)
 
     s = sub.add_parser("entregar", help="manda o pacote para o cliente, guarda só o MP4 e apaga a pasta de trabalho")
     s.add_argument("nome")

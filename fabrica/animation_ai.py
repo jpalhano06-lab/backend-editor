@@ -53,8 +53,8 @@ _TRAVA_CENAS = threading.Lock()
 TEMAS = {
     # o padrão desde 2026-10-13 (pedido do usuário: "transforme essas receitas em modelos que a fábrica monta sozinha e
     # fixo na fábrica"): motor próprio (motor_impacto.js), com a foto da cena atrás, letra gigante, uma cor de destaque
-    # (amarelo; vermelho no outro lado da comparação), brilho, grão e a cena se montando peça por peça. Saiu do protótipo
-    # em teste-estilos/prototipo. Os tipos sem receita própria não são oferecidos (TIPOS_IMPACTO)
+    # (amarelo; vermelho no outro lado da comparação), brilho, grão e a cena se montando peça por peça. Saiu de um protótipo
+    # aprovado pelo usuário. Os tipos sem receita própria não são oferecidos (TIPOS_IMPACTO)
     "impacto": {"fundo": "#07080A", "txt": "#F5F3EE", "txt2": "#D9D4CA", "acc": "#FFD23F", "acc2": "#FF4D3D",
                 "brilho-a": "rgba(77,163,255,.20)", "brilho-b": "rgba(255,210,63,.14)", "_motor": "impacto"},
     # o visual do Motion IA, de produto da Apple (pedido do usuário em 2026-10-10: "o mesmo estilo visual de cores estilo

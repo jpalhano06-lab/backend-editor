@@ -128,7 +128,7 @@ O roteiro manda: o que a narração cita tem que aparecer, na hora em que é fal
 - **O agente diz o que a foto obrigatoriamente mostra** (campo `exato` de cada cena: "Pripyat", "Geiger counter", "New Safe Confinement", "Eurasian lynx", ou vazio quando qualquer representação direta serve). Com `exato`, a Wikimedia vem primeiro e só entra foto cujas tags citem o nome (nome composto: todas as palavras, senão "Chernobyl Elephant's Foot" aceitaria um elefante). **O `exato` também é o primeiro termo de busca**, na busca da cena e no tapa-buraco: antes ele era só filtro, e a cena 11 do aparte2-2min-v2 exigia "Instituto Butantan", buscava "antivenom vials corridor" e descartava todos os candidatos (0 de 12 citavam o nome; com o `exato` na busca, 7 de 12). É a correção de raiz: antes cada etapa adivinhava o essencial pela busca, e toda adivinhação tinha furo. **O `exato` dentro da busca também é buscado sozinho**, e palavra que as tags perdem (`_SO_ESTILO`, como "stock") nunca é exigida: a cena 35 do mcp-cafe-5min buscava "New York stock exchange screen", o "New York Stock Exchange" sozinho nunca era buscado e o filtro exigia "stock", que nenhuma tag tinha; entrou um túnel de trem. Sem o campo (projeto antigo), `midia.exigido_da_cena` deduz o animal ou o nome próprio do roteiro.
 - **Busca com o contexto do bloco**: quando a busca fala do assunto do bloco, o `contexto` do mapa vai junto ("sugar glider" vira "sugar glider marsupial animal"). No tapa-buraco, candidato cujas tags não citam o assunto nunca entra às cegas.
 - **Texto curto com fundamento** (`textos.REGRAS_QUALIDADE`, no pedido do agente para o `overlay`, que vira o texto da animação em camada): número com o que ele mede, nome com a identificação ou a conclusão do trecho. Nunca metadados ("PARTE 2", "NÚMERO 8" sem o nome), palavra solta ou palavra que não foi falada. Na dúvida, sem texto.
-- **Voz do Edge com o tempo de cada palavra** (`boundary="WordBoundary"`): legenda e cortes seguem a fala. Projeto antigo se corrige com `narracao.realinhar_edge`.
+- **Voz do Edge com o tempo de cada palavra** (`boundary="WordBoundary"`): legenda e cortes seguem a fala. (O Edge saiu da fábrica em 2026-10-26; o `realinhar_edge` saiu junto.)
 - Cena de IA cortada por citação refaz o prompt de cada fatia, para não gerar a mesma imagem repetida.
 - **Frase que anuncia o assunto vai com a frase seguinte** (`cenas._abre_assunto`, no `_pre_cortar`): "Em segundo
   lugar, a água-viva." (2 s) era juntada à frase anterior, do peixe-leão, e o agente pedia o peixe-leão para o corte
@@ -717,117 +717,18 @@ status` e em `GET /api/projetos/NOME/qualidade`. Serve para saber se uma mudanç
 reais que já deram errado (elefante de Tsavo no acampamento, zebra no leão, "Patterson" trazendo ginasta, "tranca
 quebrada" trazendo cânion). Sem rede e sem custo. Toda regra nova da captura ganha um caso aqui.
 
-## MCP: o Claude do cliente pensa o vídeo (teste)
+## MCP: saiu da fábrica
 
-`fabrica/mcp_servidor.py` e `fabrica/cliente.py`, pedido do usuário em 2026-10-06: quem usa o MCP manda o roteiro pelo
-próprio Claude Code, e as decisões saem da assinatura dele. `fabrica mcp --porta 8092` sobe o MCP em
-`http://127.0.0.1:8092/mcp` (biblioteca `mcp` 2.x: `MCPServer`, não `FastMCP`).
+Desde 2026-11-02, a pedido do usuário ("mcp é obsoleto, pode remover"), a fábrica **não tem mais o MCP** (o servidor
+`fabrica mcp` em mcp.bbnews.cc, as contas `fabrica mcp-cliente`, a fila de tarefas respondida pelo Claude do cliente,
+o comando `/tiplabs` e a pasta `tiplabs-cliente`). Saíram `mcp_servidor.py`, `cliente.py` e `clientes_mcp.py`, os
+ganchos deles na escolha das fotos, no Jev, no roteirista, na revisão e nos custos, a seção `mcp` do config.yaml, a
+dependência `mcp` e o MCP dos scripts LIGAR, DESLIGAR e VIGIA. O "Gemini sem pensar" das rotas `gemini:` da cadeia,
+que morava na seção `mcp`, passou para `gemini.raciocinio_na_cadeia`. **Não trazer de volta.**
 
-- **Desde 2026-10-09 o MCP não usa mais a assinatura do cliente: a fábrica pensa tudo pelo Gemini** (pedido do
-  usuário; `mcp.pelo_cliente: false`, `cliente.pela_fabrica`). O roteiro (mapa, cenas, diretor, orquestradora) segue
-  o caminho de sempre, pelo OpenRouter e pelas APIs gratuitas do `.env` (`mcp.modelos_roteiro` vazio: Nemotron Ultra
-  gratuito, DeepSeek de reserva, cadeia de principais; uma lista ali põe outros modelos na frente), o resto
-  do texto pelo `mcp.modelos_texto` (3.1 Flash-Lite, Qwen 3.7 Flash de reserva) e as imagens pelo
-  `mcp.modelos_visao`, seja qual for o modelo que a etapa pediu (`cliente.modelos_do_mcp`, em
-  `openrouter_local.perguntar` e `roteirista._modelo_agente`). O Jev julga como sempre. Nada vai para a fila, a
-  reserva dos 60% não entra, e o `/tiplabs` (Haiku) só chama `criar_video`, `acompanhar` e `entregar_video`, sem
-  operador. Tudo o que vem abaixo sobre a fila e o Claude do cliente vale só com `mcp.pelo_cliente: true`
-  (`COMANDO_COM_OPERADOR`).
-- **O MCP não trava** (pedido do usuário em 2026-10-09): o estado de cada produção fica no disco
-  (`projetos/NOME/mcp_producao.json`) e `retomar_producoes`, ao subir o MCP, põe de novo para andar os vídeos que
-  estavam sendo feitos, com o tempo desde o começo de verdade. Falha no meio do vídeo tenta de novo sozinha, de onde
-  parou (`mcp.tentativas_producao`, 4, esperando 1, 2 e 3 min); cancelado não volta. `acompanhar` e `esperar` são
-  `async` e esperam com `anyio.sleep`: as ferramentas síncronas dividem 40 threads, e 40 clientes acompanhando ao mesmo
-  tempo travariam o MCP inteiro. O **vigia** (`VIGIA-TIPLABS.ps1`, ligado escondido pelo LIGAR-TIPLABS e desligado
-  primeiro pelo DESLIGAR, um só por vez) confere a cada minuto a fábrica e o MCP, religa o que caiu e reinicia o que
-  ficou duas vezes sem responder; anota em `vigia.log`. Desligar o computador ainda pede o LIGAR-TIPLABS ao ligar.
+## Pacote do projeto
 
-- **Projeto do MCP** (`"modelo": "cliente"` no `projeto.json`, `cliente.ativo`): todo pedido a modelo de linguagem
-  (`openrouter_local.perguntar` e `uma_rota`, e o Jev, que nesse modo julga pelo caminho do modelo principal) vira uma
-  tarefa na fila de `cliente.py`, com o mesmo texto, as mesmas imagens e o mesmo esquema; a produção espera a
-  resposta. Resposta sem as chaves obrigatórias é recusada e a tarefa continua; tarefa entregue e não respondida em
-  15 min volta para a fila. As regras da fábrica valem iguais: só muda quem responde.
-- **Ferramentas:** `criar_video` (sem `confirmar`, só a estimativa, que zera as decisões do modelo nesse modo;
-  `voz_do_computador` e `imagens_de_ia=false` fazem um teste sem custo), `andamento`, `proximas_tarefas` (as
-  instruções de uma etapa vão inteiras só na primeira tarefa dela; `ver_instrucoes` mostra de novo), `responder`,
-  `entregar_video` (pacote para o cliente, MP4 em `entregas/`), `importar_pacote`, `cancelar`, `listar_perfis`.
-- **Ajustes por projeto:** `config_override` no `projeto.json` mistura seções por cima do `config.yaml`
-  (`Projeto.__init__`); voz `"computador"` é a voz do sistema fora do modo offline.
-- **Teste de 2026-10-06** (`mcp-pangolim`, 3 frases, 11,6 s): o ciclo inteiro pelo MCP, com as decisões tomadas pelo
-  Claude no papel do cliente, saiu em US$ 0 (nenhum `uso_*.json`). Foram 17 tarefas: mapa 1, cenas 1, escolha das
-  fotos 3, Jev antes do download 3, descrição 3, Jev depois do download 3, busca nova 1, trilha 1, revisão do vídeo 1.
-- **O que falta:** juntar escolha e julgamento (quem escolheu já viu a imagem: o Jev antes e depois do download e a
-  descrição repetem o trabalho; são 3 das 4 tarefas por cena), várias cenas por tarefa, links de download em vez de
-  caminhos (o teste roda na mesma máquina), um token por cliente e a contagem das tarefas por vídeo.
-
-- **Comando `/tiplabs roteiro.txt nome [perfil]`** (pedido do usuário em 2026-10-07; `mcp_servidor.texto_do_comando`).
-  Comando que vem de MCP sempre ganha o prefixo `/mcp__servidor__` no Claude Code, então o `/tiplabs` é um arquivo
-  no computador do cliente, `~/.claude/commands/tiplabs.md`: a ferramenta `instalar_tiplabs` devolve o conteúdo e o
-  Claude do cliente grava uma vez (a cópia fica em `comandos/tiplabs.md`). Sem o arquivo, o mesmo texto está no
-  prompt `tiplabs` do servidor (`/mcp__fabrica__tiplabs`). O comando produz até o fim sem ninguém chamar o MCP à mão. Ele cria o vídeo, mostra a
-  estimativa, e então repete `esperar(nome)` (espera até 55 s no servidor por tarefa nova ou pelo fim, sem gastar nada
-  e sem dormir no terminal) e, quando há tarefa, lança um **subagente** por grupo (`cliente.grupo`): **roteiro** (mapa,
-  cenas, diretor) com o Opus e **visual** (fotos, conferência, revisão, animação, trilha) com o Sonnet. Cada subagente
-  responde até 10 tarefas e é descartado: as imagens nunca se acumulam na conversa principal, que o Claude Code relê a
-  cada passo. No mcp-cafe-5min a fábrica ficou 6 h parada porque ninguém chamou o MCP.
-- **Teste completo de 2026-10-07** (`ouro-serra-1min`, 54 s, 16 cenas, pelo `/tiplabs` num Claude Code separado,
-  ligado em https://mcp.bbnews.cc): 8 tarefas, 14 min, US$ 0,005 na fábrica (voz da Fish com `criar_video(voz="fish")`).
-  O Claude do cliente gastou o equivalente a US$ 2,22 em API: Opus US$ 0,83 (o coordenador) e Sonnet US$ 1,39 (39 mil
-  tokens de raciocínio). Por isso o `/tiplabs` roda com `model: sonnet` e o subagente é pedido a decidir direto.
-- **Reserva pelo OpenRouter quando o cliente para** (`cliente._esperar`, `cliente.Reserva`, `cliente.atende`, pedido do
-  usuário em 2026-10-07: a maioria dos clientes terá o Claude Pro, e um vídeo de 20 min não cabe numa janela de uso).
-  O Claude do cliente faz tudo o que conseguir. Tarefa **visual** parada há `cliente.espera_reserva` (600 s), sem o
-  cliente responder nada do projeto: com **60% ou mais do vídeo feito** (`cliente.progresso`: cenas com a escolha, a
-  mídia ou a conferência prontas; `cliente.minimo_para_reserva`), a fábrica segue sozinha pela própria cadeia (os
-  gratuitos e o Qwen 3.7 Flash, sem pedir confirmação de pago: `pago.autorizar` libera projeto do MCP); abaixo disso
-  a produção **pausa** e o `andamento` pede para rodar o `/tiplabs` de novo quando o limite voltar. Tarefa de roteiro
-  nunca vai para a reserva. Quando o cliente volta a responder, as tarefas visuais são dele de novo. Contas novas
-  começam com **1 vídeo por dia** (`clientes_mcp.POR_DIA`).
-- **Instalação pelo próprio Claude do cliente** (pasta `tiplabs-cliente/`, fora do Git da fábrica: ela vira um
-  repositório à parte, sem nenhum código da fábrica, pedido do usuário em 2026-10-07). O cliente abre o Claude Code
-  nela e diz "instala o comando tiplabs"; o `CLAUDE.md` da pasta manda seguir `INSTALAR-TIPLABS.md`: o token vai
-  num `token.txt` (nunca no chat), é conferido no servidor (200 ou 401), o MCP entra com `--scope user` (com o
-  escopo local de antes ele só valia na pasta onde foi instalado), o `/tiplabs` vai para `~/.claude/commands`,
-  `mcp__fabrica` entra no `permissions.allow` e o `token.txt` é apagado. **Mudou o texto do comando
-  (`mcp_servidor.COMANDO`), copie `comandos/tiplabs.md` para `tiplabs-cliente/comando/tiplabs.md`.**
-- **Instruções uma vez por chamada** (`proximas_tarefas(..., tipo, instrucoes_que_ja_tenho)`): antes o "já entregue"
-  era global, e o segundo subagente ficaria sem as regras. Agora cada chamada manda as instruções inteiras uma vez,
-  menos as das marcas que quem pede diz que já tem.
-- **Menos tokens na escolha das fotos** (43% do consumo do mcp-cafe-5min): a folha de candidatos vai com 1280 px de
-  largura (`midia._folha_leve`, `cliente.largura_da_folha`; uns 920 tokens em vez de 1.380, miniaturas de 320 px ainda
-  legíveis), e o texto só com o que decide (`midia._bloco_do_cliente`): sem os termos buscados, a duração, os trechos
-  vizinhos e o "deveria mostrar" repetido; a descrição de cada candidato sem tags repetidas e em até 90 letras.
-- **Revisão do vídeo só onde ela acrescenta** (`revisao_video.cenas_que_o_cliente_ainda_nao_viu`): o cliente já viu
-  cada foto na escolha e na conferência, então a revisão olha só as cenas com animação por cima, Motion IA, as tapadas
-  ou suspeitas e as que ficaram reprovadas. No mcp-cafe-5min, 11 cenas em vez de 88.
-- **Medido no mcp-cafe-5min** (4min48s, 88 cenas, antes destas mudanças): 53 tarefas, 200 imagens, uns 295 mil tokens
-  lidos e 35 mil escritos pelo conteúdo das tarefas (sem contar o contexto relido nem o raciocínio). A escolha das
-  fotos 197 mil, as cenas 46 mil, a revisão 44 mil.
-
-
-- **MCP na internet** (`fabrica mcp --porta 8092 --url-publica https://mcp.DOMINIO`, `fabrica/clientes_mcp.py`, pedido
-  do usuário em 2026-10-07). Sem a URL, o MCP de teste roda só nesta máquina e sem senha. Com ela:
-  - **Token por cliente** (`fabrica mcp-cliente criar NOME [--por-dia 2] [--url ...]`, `listar`, `revogar NOME`): o
-    Claude Code dele manda `Authorization: Bearer TOKEN` (`claude mcp add ... --header`). O arquivo
-    `clientes_mcp.json` (fora do Git) guarda só o hash do token. Sem token ou com token errado: 401.
-  - **Cada projeto tem dono** (`dono` no projeto.json e no entrega.json): um cliente nunca vê, responde nem baixa o
-    projeto de outro, e `proximas_tarefas` exige o nome do vídeo.
-  - **Limite de vídeos por dia** (2 por padrão, o produto de R$ 1.000): conta o vídeo começado com `confirmar=true`;
-    retomar o mesmo vídeo não conta de novo (`producao_contada`).
-  - **Entrega por link** (`/baixar/CODIGO/ARQUIVO`, válido 7 dias): `entregar_video(nome)` deixa o MP4 e o pacote em
-    `entregas/NOME/` e devolve os dois links; o /tiplabs baixa com curl. Antes era um caminho no disco do servidor.
-    `importar_pacote` fica fora pela internet (falta o envio do pacote).
-  - Só o Host da URL pública é aceito (o resto, 421). Testado na porta 8093: sem token 401, token errado 401, token
-    certo entra e não vê o projeto de outro dono, código de download inventado 404.
-  - **No ar em https://mcp.bbnews.cc** (2026-10-07): subdomínio no túnel da Cloudflare que já serve o editor, apontando para localhost:8092, com uma Regra de Configuração para o host mcp.bbnews.cc que desliga o "Estou Sob Ataque" e a verificação de integridade do navegador (o domínio está em modo Sob Ataque, e o desafio barrava o Claude Code com 403). Testado por fora: 401 sem token, 200 com token, o vídeo de 209 MB baixado em 26 s.
-  - **Sobe junto com a fábrica** pelo LIGAR-TIPLABS (porta 8092, `mcp.log`), e o DESLIGAR-TIPLABS desliga os dois.
-    Desde 2026-10-07 o MCP roda desta pasta: a cópia `E:\BACKUUUUUUUUUUUUUUUUUUP\teste-MCP-fabrica-para-amigo`, onde ele
-    foi testado, ficou só como backup.
-  - **Falta:** apagar os pacotes de `entregas/` depois de baixados ou vencidos.
-
-## Pacote do projeto (teste do MCP)
-
-`fabrica/pacote.py`, pedido do usuário em 2026-10-06, nesta cópia de teste do MCP: **no servidor fica só o MP4
+`fabrica/pacote.py`, pedido do usuário em 2026-10-06 (nasceu para o MCP, que saiu da fábrica em 2026-11-02): **no servidor fica só o MP4
 pronto; o projeto fica com o cliente.** `fabrica entregar NOME --cliente PASTA` escreve o pacote (`NOME.zip`) na pasta
 do cliente, guarda o vídeo em `entregas/NOME/` e apaga a pasta de trabalho (só depois de o zip ser conferido).
 `fabrica importar ARQUIVO.zip [--nome] [--substituir]` remonta a pasta para editar, e `fabrica pacote NOME [--medir]`
@@ -1294,7 +1195,7 @@ e, sem saldo para ela, de `narracao._palavras_estimadas`, que casa cada ponto e 
 áudio do Edge, que informa o tempo real: erro médio de 0,08 s por palavra. **O Edge saiu da fábrica em 2026-10-26**
 (pedido do usuário: "o edge vai ser descontinuado"; ele já recusava com erro 403 e o teste-animacao-1min travou na
 narração): os perfis `base-documentario` (e quem herda dele) e `teste-roteiro-palhano` usam a Fish com a voz "São
-Cipriano" (`fish.voz_padrao` no config.yaml), e o site, sem provedor escolhido, cria o projeto com a Fish e essa voz
+Cipriano" (o `voice_id` no perfil), e o site, sem provedor escolhido, cria o projeto com a Fish e essa voz
 (antes gravava o Edge `pt-BR-AntonioNeural`). Projeto antigo com Edge continua com a narração guardada; narrar de novo
 com o Edge dá um aviso claro (`narracao`) para trocar para a Fish no editor.
 
@@ -1368,7 +1269,7 @@ junto: dos US$ 19,31 que a conta tinha gastado, só US$ 8,02 estavam nos projeto
   `relatorios/vazamento.csv` (cobrado, registrado, sem registro). Acima de US$ 0,02 numa janela, o log da fábrica
   diz "VAZAMENTO" com o horário. Diferença numa janela em que a fábrica não fez nada não é dela. `fabrica consumo`
   mostra as janelas com diferença. Sem resposta do OpenRouter, a janela é pulada (nunca usa número velho).
-- **Processo que já estava rodando** (servidor, MCP) só registra depois de reiniciado (DESLIGAR e LIGAR).
+- **Processo que já estava rodando** (servidor) só registra depois de reiniciado (DESLIGAR e LIGAR).
 - **Google Planilhas que se atualiza sozinho** (pedido do usuário em 2026-10-09): a fábrica serve o registro em
   `/consumo/openrouter.csv` e o total oficial em `/consumo/oficial.csv`, pelo túnel (`consumo.url_publica`,
   editor.bbnews.cc, sem o desafio do Cloudflare), com uma chave **só de leitura e só para isso**

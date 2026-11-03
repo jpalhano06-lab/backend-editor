@@ -13,15 +13,11 @@ vozes_candidatas*.json
 # registros da fábrica
 fabrica.log
 fabrica.log.erros
-mcp.log.erros
 *.log
 *.pyc
 aprendizados/
 efeitos/gerados/
 genaipro_medido.json
-clientes_mcp.json
-teste-cliente/
-tiplabs-cliente/
 
 vigia.log
 vigia.pid
