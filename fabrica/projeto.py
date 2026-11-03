@@ -79,10 +79,8 @@ class Projeto:
         return json.loads((self.pasta / nome).read_text(encoding="utf-8"))
 
     def salvar_json(self, nome: str, dados) -> None:
-        destino = self.caminho(nome)
-        temporario = destino.with_name(destino.name + ".tmp")
-        temporario.write_text(json.dumps(dados, ensure_ascii=False, indent=2), encoding="utf-8")
-        temporario.replace(destino)
+        from .util import gravar_atomico
+        gravar_atomico(self.caminho(nome), json.dumps(dados, ensure_ascii=False, indent=2))
 
     def roteiro(self) -> str:
         """Texto narrado, já sem as marcações [SIMBOLO]."""
